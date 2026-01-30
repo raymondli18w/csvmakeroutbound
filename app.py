@@ -142,14 +142,15 @@ def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
         out_row = {chr(65 + i): '' for i in range(26)}
         out_row.update({f"A{chr(65+i)}": '' for i in range(26)})
 
+        # Populate according to your spec — AF, AG, AH REMOVED
         out_row['A'] = 'BC'
         out_row['B'] = trim_text(client, 10)
         out_row['C'] = trim_text(so, 30)
         out_row['D'] = trim_text(safe_value(row, 'Customer PO'), 30)
         out_row['F'] = pick_date
-        out_row['H'] = trim_text(safe_value(row, 'Ship To Code'), 10)  # may be empty
+        out_row['H'] = ''  # Ship To Code (not in your data)
         out_row['I'] = trim_text(safe_value(row, 'Ship To'), 45)
-        out_row['J'] = ''  # Ship To 2 (not in your data)
+        out_row['J'] = ''  # Ship To 2
         out_row['K'] = trim_text(safe_value(row, 'Street'), 30)
         out_row['L'] = ''  # Address Line 2
         out_row['M'] = trim_text(safe_value(row, 'City'), 10)
@@ -159,15 +160,14 @@ def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
         out_row['Q'] = ''  # Carrier Code
         out_row['R'] = ''  # Carrier Name
         out_row['T'] = ''  # Pro Number
-        out_row['U'] = trim_text(safe_value(row, 'Ref 1'), 30)  # Not mapped — leave empty or map Reference?
+        out_row['U'] = ''  # Ref 1 (optional)
         out_row['V'] = trim_text(safe_value(row, 'Customer PO'), 30)
         out_row['W'] = ''  # Ref 3
         out_row['X'] = trim_text(item, 20)
         out_row['Y'] = qty
         out_row['AC'] = ''  # Desc 2
         out_row['AD'] = ''  # Lot
-        out_row['AF'] = trim_text(safe_value(row, 'Customer PO'), 30)
-        out_row['AG'] = trim_text(so, 30)
+        # ❌ REMOVED: AF, AG, AH
         out_row['AJ'] = trim_text(whse, 10)
         out_row['AK'] = ''  # Date2
 
@@ -191,7 +191,7 @@ st.set_page_config(page_title="TSV to Outbound CSV", layout="wide")
 st.title("🚛 TSV to Outbound CSV Converter")
 st.markdown("""
 Paste **tab-separated** data below.  
-Required: `Client`, `WHSE`, `Reference`, `Pick Date`, `name`, `item`, `qty`, `Customer PO`
+Required columns: `Client`, `WHSE`, `Reference`, `Pick Date`, `name`, `item`, `qty`, `Customer PO`
 """)
 
 raw_data = st.text_area("Paste your TSV data:", height=300)
@@ -202,10 +202,22 @@ custom_fmt = ""
 if date_opt == "Custom":
     custom_fmt = st.text_input("Enter strftime format (e.g., %d/%m/%Y):", value="%m/%d/%Y")
 
+st.markdown("### 💾 Output Format")
+output_format = st.radio(
+    "Choose CSV output format:",
+    (
+        "CSV (UTF-8) – Standard web/text format",
+        "CSV (ANSI / Windows-1252) – For legacy systems",
+        "Microsoft Excel-compatible CSV – With \\r\\n line endings"
+    ),
+    index=0
+)
+
 if st.button("Generate CSV"):
     if not raw_data.strip():
         st.warning("⚠️ Please paste data.")
     else:
+        # Determine date parsing hint
         fmt_hint = "auto"
         if date_opt == "MM/DD/YYYY":
             fmt_hint = "MM/DD/YYYY"
@@ -213,19 +225,35 @@ if st.button("Generate CSV"):
             fmt_hint = "YYYY-MM-DD"
         elif date_opt == "Custom":
             if not custom_fmt.strip():
-                st.error("❌ Enter a custom format.")
+                st.error("❌ Enter a custom date format.")
                 st.stop()
             fmt_hint = "custom"
 
+        # Process data
         df_out = process_tsv(raw_data, date_format_hint=fmt_hint, custom_format=custom_fmt)
         if df_out is not None:
-            # ✅ COMMA-DELIMITED CSV, filename starts with 's_'
-            csv_data = df_out.to_csv(index=False, header=False, sep=',', encoding='utf-8')
-            
+            # Prepare CSV based on selected format
+            if "UTF-8" in output_format:
+                csv_bytes = df_out.to_csv(index=False, header=False, sep=',', encoding='utf-8', lineterminator='\n')
+                mime = "text/csv; charset=utf-8"
+                filename = "s_output_utf8.csv"
+            elif "ANSI" in output_format:
+                csv_bytes = df_out.to_csv(index=False, header=False, sep=',', encoding='cp1252', lineterminator='\n')
+                mime = "text/csv"
+                filename = "s_output_ansi.csv"
+            elif "Microsoft" in output_format:
+                csv_bytes = df_out.to_csv(index=False, header=False, sep=',', encoding='utf-8', lineterminator='\r\n')
+                mime = "text/csv"
+                filename = "s_output_excel.csv"
+            else:
+                csv_bytes = df_out.to_csv(index=False, header=False, sep=',', encoding='utf-8')
+                filename = "s_output_csv.csv"
+                mime = "text/csv"
+
             st.download_button(
                 label="📥 Download CSV",
-                data=csv_data,
-                file_name="s_output_csv.csv",  # ← starts with 's_'
-                mime="text/csv"
+                data=csv_bytes,
+                file_name=filename,
+                mime=mime
             )
             st.success("✅ CSV generated successfully!")
