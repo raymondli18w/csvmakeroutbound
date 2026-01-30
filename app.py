@@ -72,7 +72,7 @@ COLUMN_SYNONYMS = {
 }
 
 # =========================
-# Address Validation (optional if no country)
+# Address Validation
 # =========================
 CANADA_PROVINCES = ["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]
 US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS",
@@ -108,7 +108,10 @@ def parse_to_mm_dd_yyyy(date_input, format_hint="auto", custom_format=""):
         return None
     date_str = str(date_input).strip()
 
-    # Extended format map including MON (e.g., DEC, JAN)
+    # Prevent 'nan' string from being parsed
+    if date_str.lower() in ('nan', 'null', 'none', ''):
+        return None
+
     format_map = {
         "MM/DD/YYYY": "%m/%d/%Y",
         "MM-DD-YYYY": "%m-%d-%Y",
@@ -126,7 +129,6 @@ def parse_to_mm_dd_yyyy(date_input, format_hint="auto", custom_format=""):
         "DD/MON/YY (e.g., 12/DEC/25)": "%d/%b/%y",
     }
 
-    # Handle custom format
     if format_hint == "custom":
         try:
             dt = datetime.strptime(date_str, custom_format)
@@ -134,19 +136,16 @@ def parse_to_mm_dd_yyyy(date_input, format_hint="auto", custom_format=""):
         except (ValueError, TypeError):
             return None
 
-    # Handle explicit named formats from dropdown
     if format_hint in format_map:
         fmt = format_map[format_hint]
         try:
             dt = datetime.strptime(date_str, fmt)
-            # Fix 2-digit year (e.g., 25 → 2025)
             if "%y" in fmt and dt.year < 1900:
                 dt = dt.replace(year=dt.year + 100)
             return dt.strftime("%m/%d/%Y")
         except ValueError:
             return None
 
-    # Auto-detect: try all common formats (including MON styles)
     if format_hint == "auto":
         auto_formats = [
             "%m/%d/%Y", "%m-%d-%Y", "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y",
@@ -178,7 +177,7 @@ def trim_text(val, max_len):
 
 def safe_value(row, col):
     val = row.get(col, '')
-    if pd.isna(val) or val == '' or val is None:
+    if pd.isna(val) or val == '' or val is None or str(val).lower() == 'nan':
         return ''
     return str(val)
 
@@ -199,7 +198,7 @@ def check_address_consistency(df):
     mismatch_flag = []
     addr_cols = ['Ship To', 'Ship To 2', 'Street', 'City', 'state', 'Zip Code', 'Country/Region']
     for _, row in df.iterrows():
-        so_no = safe_value(row, 'Sales Order No.')
+        so_no = safe_value(row, 'Sales Order No.').strip()
         if not so_no:
             mismatch_flag.append(False)
             continue
@@ -228,10 +227,17 @@ def check_address_consistency(df):
 # =========================
 def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
     try:
-        df = pd.read_csv(StringIO(raw_text), sep=None, engine='python', dtype=str, keep_default_na=False, na_values=[])
+        # 🔧 FIX: Use explicit tab delimiter
+        df = pd.read_csv(StringIO(raw_text), sep='\t', engine='python', dtype=str, keep_default_na=False, na_values=[])
     except Exception as e:
-        st.error(f"Error parsing data: {e}")
+        st.error(f"Error parsing TSV: {e}")
         return None
+
+    # 🔧 CLEAN: Replace 'nan' strings introduced by dtype=str
+    df = df.replace({'nan': '', 'NaN': '', 'NAN': '', 'null': '', 'None': ''}).fillna('')
+
+    # Optional: Debug detected columns
+    # st.write("Detected columns:", list(df.columns))
 
     df = standardize_headers(df)
 
@@ -241,7 +247,7 @@ def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
         if col not in df.columns:
             df[col] = ''
 
-    # Add optional columns (including Date2)
+    # Add optional columns
     optional_cols = [
         'Ship To', 'Ship To 2', 'Ship To Code', 'Street', 'City', 'state',
         'Zip Code', 'Country/Region', 'Customer PO', 'Ref 1', 'Ref 2', 'Ref 3',
@@ -261,7 +267,7 @@ def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
             lambda x: parse_to_mm_dd_yyyy(x, format_hint=date_format_hint)
         )
 
-    # Parse Date2 using same logic
+    # Parse Date2
     if date_format_hint == "custom":
         df['Date2 Clean'] = df['Date2'].apply(
             lambda x: parse_to_mm_dd_yyyy(x, format_hint="custom", custom_format=custom_format)
@@ -315,14 +321,14 @@ def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
             out_row = {col: '' for col in all_cols}
             out_row['A'] = 'BC'
             out_row['B'] = trim_text(client_val, 10)
-            out_row['C'] = trim_text(so_val, 30)                                 # Sales Order No.
-            out_row['D'] = trim_text(safe_value(row, 'Customer PO'), 30)         # Customer PO
-            out_row['F'] = date_val  # MM/DD/YYYY
+            out_row['C'] = trim_text(so_val, 30)
+            out_row['D'] = trim_text(safe_value(row, 'Customer PO'), 30)
+            out_row['F'] = date_val
             out_row['H'] = trim_text(safe_value(row, 'Ship To Code'), 10)
             out_row['I'] = trim_text(safe_value(row, 'Ship To'), 45)
             out_row['J'] = trim_text(safe_value(row, 'Ship To 2'), 45)
             out_row['K'] = trim_text(safe_value(row, 'Street'), 30)
-            out_row['L'] = trim_text(safe_value(row, 'Ship To Address 2'), 30)
+            out_row['L'] = trim_text(safe_value(row, 'Ship To Address 2'), 30)  # Note: may not exist
             out_row['M'] = trim_text(safe_value(row, 'City'), 10)
             out_row['N'] = trim_text(safe_value(row, 'state'), 10)
             out_row['O'] = trim_text(safe_value(row, 'Zip Code'), 10)
@@ -331,7 +337,7 @@ def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
             out_row['R'] = trim_text(safe_value(row, 'Carrier Name'), 20)
             out_row['T'] = trim_text(safe_value(row, 'Pro Number'), 20)
             out_row['U'] = trim_text(safe_value(row, 'Ref 1'), 30)
-            out_row['V'] = trim_text(safe_value(row, 'Customer PO'), 30)         # D → V
+            out_row['V'] = trim_text(safe_value(row, 'Customer PO'), 30)
             out_row['W'] = trim_text(safe_value(row, 'Ref 3'), 30)
             out_row['X'] = trim_text(item_val, 20)
             try:
@@ -341,12 +347,10 @@ def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
             out_row['Y'] = qty
             out_row['AC'] = trim_text(safe_value(row, 'Desc 2'), 50)
             out_row['AD'] = trim_text(safe_value(row, 'Lot'), 20)
-            out_row['AF'] = trim_text(safe_value(row, 'Customer PO'), 30)        # D → AF
-            out_row['AG'] = trim_text(so_val, 30)                                # C → AG
+            out_row['AF'] = trim_text(safe_value(row, 'Customer PO'), 30)
+            out_row['AG'] = trim_text(so_val, 30)
             out_row['AJ'] = trim_text(whse_val, 10)
-            # Date2 → AK
-            date2_clean = row.get('Date2 Clean', None)
-            out_row['AK'] = date2_clean if date2_clean is not None else ''
+            out_row['AK'] = row.get('Date2 Clean', '') or ''
             output_rows.append(out_row)
 
     if not output_rows:
@@ -362,15 +366,14 @@ def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
 # =========================
 st.title("TSV/CSV Converter (Extended & Robust)")
 st.markdown("""
-Paste your TSV or CSV data below.  
+Paste your **tab-separated** data below.  
 ✅ **Required fields**: `Sales Order No.`, `Item No.`, `Each Qty`, `CLIENT`, `WHSE`, `Pick Date`  
 ✅ **Output date**: always `MM/DD/YYYY`  
 ✅ Supports dates like `12DEC2025`, `12-DEC-25`, etc.
 """)
 
-raw_data = st.text_area("Paste your data here:", height=300)
+raw_data = st.text_area("Paste your TSV data here (use actual tabs between columns):", height=300)
 
-# Date format selector with MON support
 st.markdown("### 📅 Date Format Handling")
 date_format_option = st.selectbox(
     "How should dates in the 'Pick Date' column be interpreted?",
@@ -399,7 +402,6 @@ custom_format = ""
 if date_format_option == "Custom format (enter below)":
     custom_format = st.text_input("Enter Python strftime format (e.g., %d.%m.%Y):", value="%m/%d/%Y")
 
-# Process button
 if st.button("Generate CSV"):
     if not raw_data.strip():
         st.warning("Please paste your data.")
