@@ -4,75 +4,43 @@ from io import StringIO
 from datetime import datetime
 
 # =========================
-# Column Synonyms (unchanged)
+# Column Synonyms Mapping (tailored to your headers)
 # =========================
 COLUMN_SYNONYMS = {
-    'Sales Order No.': [
-        'reference', 'ref', 'hdr', 'po ref', 'order', 'header ref', 'so no', 'ClientOrderNumber',
-        'ship reference', 'reference #', 'Reference'
-    ],
-    'Pick Date': [
-        'pick date', 'date picked', 'ORDER_DATE', 'ship date', 'order date', 'date',
-        'Pick Date'
-    ],
-    'Item No.': [
-        'item', 'product', 'sku', 'ItemCode', 'item number', 'item no', 'item code', 'item'
-    ],
-    'Each Qty': [
-        'qty', 'quantity', 'Each Qty', 'qty', 'OrderQuantity', 'units'
-    ],
-    'WHSE': [
-        'whse', 'warehouse', 'WHSE', 'WH'
-    ],
-    'CLIENT': [
-        'client', 'Client', 'customer id', 'Customer'
-    ],
-    'Ship To': ['name', 'Ship To', 'recipient'],
-    'Street': ['Street', 'street', 'addr 1'],
-    'City': ['City', 'city'],
-    'state': ['Province', 'province', 'state'],
-    'Zip Code': ['Zip Code', 'zip', 'postal'],
-    'Country/Region': ['Country', 'country'],
-    'Customer PO': ['Customer PO', 'po', 'PO', 'Customer PO']
+    'Sales Order No.': ['reference', 'Reference', 'ref', 'Ref', 'Order', 'PO'],
+    'Pick Date': ['pick date', 'Pick Date', 'date', 'Date', 'Order Date'],
+    'Item No.': ['item', 'Item', 'sku', 'SKU', 'Item No.', 'Item Number'],
+    'Each Qty': ['qty', 'Qty', 'quantity', 'Quantity', 'Each Qty'],
+    'WHSE': ['whse', 'WHSE', 'warehouse', 'Warehouse'],
+    'CLIENT': ['client', 'Client', 'Customer', 'customer id'],
+    'Ship To': ['name', 'Name', 'Ship To', 'ship to', 'recipient'],
+    'Street': ['street', 'Street', 'Address', 'address'],
+    'City': ['city', 'City'],
+    'state': ['province', 'Province', 'state', 'State'],
+    'Zip Code': ['zip code', 'Zip Code', 'postal', 'Postal', 'ZIP'],
+    'Country/Region': ['country', 'Country', 'Country/Region'],
+    'Customer PO': ['customer po', 'Customer PO', 'PO', 'po number'],
 }
 
 # =========================
-# Address Validation (simplified — not used for validity, but kept)
-# =========================
-CANADA_PROVINCES = ["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]
-US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS",
-             "KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY",
-             "NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"]
-
-def validate_address(row):
-    return "Valid"  # Not required for row validity in your case — skip strict check
-
-# =========================
-# Date Parser
+# Date Parser → MM/DD/YYYY
 # =========================
 def parse_to_mm_dd_yyyy(date_input, format_hint="auto", custom_format=""):
     if pd.isna(date_input) or str(date_input).strip() == '':
         return None
-    date_str = str(date_input).strip().lower()
-    if date_str in ('nan', 'null', 'none', ''):
+    date_str = str(date_input).strip()
+    if date_str.lower() in ('nan', 'null', 'none', ''):
         return None
 
-    format_map = {
-        "MM/DD/YYYY": "%m/%d/%Y",
-        "MM-DD-YYYY": "%m-%d-%Y",
-        "YYYY-MM-DD": "%Y-%m-%d",
-        "DD/MM/YYYY": "%d/%m/%Y",
-        "DD-MM-YYYY": "%d-%m-%Y",
-        "MM/DD/YY": "%m/%d/%y",
-        "YYYYMMDD": "%Y%m%d",
-        "DD-MON-YYYY": "%d-%b-%Y",
-        "DD-MON-YY": "%d-%b-%y",
-        "DDMONYYYY": "%d%b%Y",
-        "DDMONYY": "%d%b%y",
-        "DD/MON/YYYY": "%d/%b/%Y",
-        "DD/MON/YY": "%d/%b/%y",
-    }
-
+    # Auto-detect common formats
+    auto_formats = [
+        "%m/%d/%Y", "%m-%d-%Y", "%Y-%m-%d",
+        "%d/%m/%Y", "%d-%m-%Y",
+        "%m/%d/%y",
+        "%d-%b-%Y", "%d-%b-%y",  # e.g., 30-Jan-2026
+        "%d %b %Y", "%b %d, %Y"
+    ]
+    
     if format_hint == "custom":
         try:
             dt = datetime.strptime(date_str, custom_format)
@@ -80,30 +48,18 @@ def parse_to_mm_dd_yyyy(date_input, format_hint="auto", custom_format=""):
         except:
             return None
 
-    if format_hint in format_map:
-        fmt = format_map[format_hint]
+    for fmt in auto_formats:
         try:
             dt = datetime.strptime(date_str, fmt)
             if "%y" in fmt and dt.year < 1900:
                 dt = dt.replace(year=dt.year + 100)
             return dt.strftime("%m/%d/%Y")
-        except:
-            return None
-
-    # Auto-detect
-    for fmt in ["%m/%d/%Y", "%m-%d-%Y", "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y",
-                "%m/%d/%y", "%Y%m%d", "%d-%b-%Y", "%d-%b-%y", "%d%b%Y", "%d%b%y"]:
-        try:
-            dt = datetime.strptime(date_str, fmt)
-            if "%y" in fmt:
-                dt = dt.replace(year=dt.year + 100 if dt.year < 100 else dt.year)
-            return dt.strftime("%m/%d/%Y")
-        except:
+        except ValueError:
             continue
     return None
 
 # =========================
-# Helpers
+# Helper Functions
 # =========================
 def trim_text(val, max_len):
     if pd.isna(val) or val == '' or val is None:
@@ -127,82 +83,83 @@ def standardize_headers(df):
     return df
 
 # =========================
-# Main Processor with DIAGNOSTICS
+# Main Processing Function
 # =========================
 def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
     try:
-        # 🔑 KEY FIX: Use explicit tab delimiter
+        # 🔑 Use explicit TAB delimiter
         df = pd.read_csv(StringIO(raw_text), sep='\t', engine='python', dtype=str, keep_default_na=False, na_values=[])
     except Exception as e:
-        st.error(f"❌ CSV parse error: {e}")
+        st.error(f"❌ Failed to parse TSV: {e}")
         return None
 
-    # Clean 'nan' strings
+    # Clean up 'nan' strings
     df = df.replace({'nan': '', 'NaN': '', 'NAN': '', 'null': '', 'None': ''}).fillna('')
 
-    st.write("📋 Raw columns:", list(df.columns))
+    st.write("📋 Detected columns:", list(df.columns))
 
+    # Standardize column names
     df = standardize_headers(df)
-    st.write("🔄 After standardization:", list(df.columns))
+    st.write("🔄 Standardized columns:", list(df.columns))
 
-    # Check required columns
-    required = ['Sales Order No.', 'Item No.', 'Each Qty', 'CLIENT', 'WHSE', 'Pick Date']
-    missing = [col for col in required if col not in df.columns]
-    if missing:
-        st.error(f"❌ Required columns missing after mapping: {missing}")
-        st.warning("💡 Tip: Your headers must include variants like 'Reference' → 'Sales Order No.', 'item' → 'Item No.', etc.")
+    # Required fields
+    required_cols = ['Sales Order No.', 'Item No.', 'Each Qty', 'CLIENT', 'WHSE', 'Pick Date']
+    missing_required = [col for col in required_cols if col not in df.columns]
+    if missing_required:
+        st.error(f"❌ Missing required columns after mapping: {missing_required}")
         return None
 
-    # Add missing optional cols as empty
-    for col in ['Ship To', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Date2']:
-        if col not: 
+    # Ensure optional columns exist
+    optional_cols = ['Ship To', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Date2']
+    for col in optional_cols:
+        if col not in df.columns:
             df[col] = ''
 
-    # Parse dates
-    df['Pick Date Clean'] = df['Pick Date'].apply(lambda x: parse_to_mm_dd_yyyy(x, format_hint=date_format_hint))
-    invalid_dates = df['Pick Date Clean'].isna() & df['Pick Date'].notna()
-    if invalid_dates.any():
-        st.warning(f"⚠️ {invalid_dates.sum()} rows have unparsable Pick Dates")
+    # Parse Pick Date
+    df['Pick Date Clean'] = df['Pick Date'].apply(
+        lambda x: parse_to_mm_dd_yyyy(x, format_hint=date_format_hint, custom_format=custom_format)
+    )
 
     # Process rows with diagnostics
     output_rows = []
-    failed_reasons = []
+    failed_rows = []
 
-    for i, row in df.iterrows():
+    for idx, row in df.iterrows():
         so = safe_value(row, 'Sales Order No.').strip()
         item = safe_value(row, 'Item No.').strip()
         qty_str = safe_value(row, 'Each Qty').strip()
         client = safe_value(row, 'CLIENT').strip()
         whse = safe_value(row, 'WHSE').strip()
-        pick_date_clean = row['Pick Date Clean']
+        pick_date = row['Pick Date Clean']
 
         reasons = []
-        if not so: reasons.append("Sales Order No. empty")
-        if not item: reasons.append("Item No. empty")
-        if not qty_str: reasons.append("Each Qty empty")
-        if not client: reasons.append("CLIENT empty")
-        if not whse: reasons.append("WHSE empty")
-        if pick_date_clean is None: reasons.append("Pick Date invalid/unparsable")
+        if not so: reasons.append("Sales Order No. missing")
+        if not item: reasons.append("Item No. missing")
+        if not qty_str: reasons.append("Each Qty missing")
+        if not client: reasons.append("CLIENT missing")
+        if not whse: reasons.append("WHSE missing")
+        if pick_date is None: reasons.append("Pick Date invalid/unparsable")
 
         if reasons:
-            failed_reasons.append((i+1, reasons))
+            failed_rows.append((idx + 2, "; ".join(reasons)))  # +2 for header + 0-index
             continue
 
-        # Try to convert qty
+        # Validate quantity is numeric
         try:
             qty = int(float(qty_str))
-        except:
-            failed_reasons.append((i+1, [f"Each Qty '{qty_str}' not numeric"]))
+        except (ValueError, TypeError):
+            failed_rows.append((idx + 2, f"Each Qty '{qty_str}' is not a number"))
             continue
 
-        # Build output
-        out_row = {chr(65 + j): '' for j in range(26)}  # A-Z
-        out_row.update({f"A{chr(65+j)}": '' for j in range(26)})  # AA-AZ etc.
+        # Build output row (A–Z + AA–AZ style)
+        out_row = {chr(65 + i): '' for i in range(26)}  # A-Z
+        out_row.update({f"A{chr(65+i)}": '' for i in range(26)})  # AA-AZ
+
         out_row['A'] = 'BC'
         out_row['B'] = trim_text(client, 10)
         out_row['C'] = trim_text(so, 30)
         out_row['D'] = trim_text(safe_value(row, 'Customer PO'), 30)
-        out_row['F'] = pick_date_clean
+        out_row['F'] = pick_date
         out_row['I'] = trim_text(safe_value(row, 'Ship To'), 45)
         out_row['K'] = trim_text(safe_value(row, 'Street'), 30)
         out_row['M'] = trim_text(safe_value(row, 'City'), 10)
@@ -211,42 +168,74 @@ def process_tsv(raw_text, date_format_hint="auto", custom_format=""):
         out_row['P'] = trim_text(safe_value(row, 'Country/Region'), 10)
         out_row['X'] = trim_text(item, 20)
         out_row['Y'] = qty
+
         output_rows.append(out_row)
 
     if not output_rows:
-        st.error("❌ No valid rows processed.")
-        if failed_reasons:
-            st.subheader("🔍 Failure details (first 10 rows):")
-            for idx, reasons in failed_reasons[:10]:
-                st.text(f"Row {idx}: {'; '.join(reasons)}")
+        st.error("❌ No valid rows found.")
+        if failed_rows:
+            st.subheader("🔍 First 10 failures:")
+            for row_num, reason in failed_rows[:10]:
+                st.text(f"Row {row_num}: {reason}")
         return None
     else:
-        st.success(f"✅ Processed {len(output_rows)} valid rows.")
+        st.success(f"✅ Successfully processed {len(output_rows)} rows.")
         return pd.DataFrame(output_rows)
 
 # =========================
 # Streamlit UI
 # =========================
-st.title("TSV Validator & Converter")
+st.set_page_config(page_title="TSV to Outbound CSV Converter", layout="wide")
+st.title("🚛 TSV to Outbound CSV Converter")
 st.markdown("""
 Paste your **tab-separated** data below.  
-Required headers (case-insensitive):  
-`Client`, `WHSE`, `Reference`, `Pick Date`, `name`, `item`, `qty`, `Customer PO`  
-→ Maps to: `CLIENT`, `WHSE`, `Sales Order No.`, `Pick Date`, `Ship To`, `Item No.`, `Each Qty`, `Customer PO`
+Required columns (case-insensitive):  
+`Client`, `WHSE`, `Reference`, `Pick Date`, `name`, `item`, `qty`, `Customer PO`
 """)
 
-raw_data = st.text_area("Paste TSV data (use real tabs!):", height=300, value="""Client	WHSE	Reference	Pick Date	name	Street	City	Zip Code	Country	item	qty	Customer PO
-KL04	1587Derwen	295583-75917	1/30/2026	Bytown Parts & Inductrial	1027 Chamberlin Avenue	Prince Rupert	V8J 4J5	CA	HF0480	42	16724""")
+raw_data = st.text_area(
+    "Paste your TSV data here:",
+    height=300,
+    placeholder="Client\tWHSE\tReference\tPick Date\tname\t...\nKL04\t1587Derwen\t295583-75917\t1/30/2026\tBytown Parts...\n"
+)
 
-st.markdown("### 📅 Date Format")
-date_opt = st.selectbox("Pick Date format:", ["Auto-detect", "MM/DD/YYYY"], index=0)
-fmt = "auto" if date_opt == "Auto-detect" else "MM/DD/YYYY"
+st.markdown("### 📅 Date Format Handling")
+date_option = st.selectbox(
+    "How should 'Pick Date' be interpreted?",
+    ["Auto-detect (recommended)", "MM/DD/YYYY", "YYYY-MM-DD", "Custom"],
+    index=0
+)
 
-if st.button("🔍 Validate & Convert"):
+custom_fmt = ""
+if date_option == "Custom":
+    custom_fmt = st.text_input("Enter strftime format (e.g., %d/%m/%Y):", value="%m/%d/%Y")
+
+if st.button("🚀 Convert to CSV"):
     if not raw_data.strip():
-        st.warning("Paste data first.")
+        st.warning("⚠️ Please paste your data.")
     else:
-        df_out = process_tsv(raw_data, date_format_hint=fmt)
-        if df_out is not None:
-            csv = df_out.to_csv(index=False, header=False, encoding='cp1252').replace('\n', '\r\n')
-            st.download_button("📥 Download CSV", csv, "output.csv", "text/csv")
+        fmt_hint = "auto"
+        if date_option == "MM/DD/YYYY":
+            fmt_hint = "MM/DD/YYYY"
+        elif date_option == "YYYY-MM-DD":
+            fmt_hint = "YYYY-MM-DD"
+        elif date_option == "Custom":
+            if not custom_fmt.strip():
+                st.error("❌ Please enter a custom date format.")
+                st.stop()
+            fmt_hint = "custom"
+
+        result_df = process_tsv(
+            raw_data,
+            date_format_hint=fmt_hint,
+            custom_format=custom_fmt
+        )
+
+        if result_df is not None:
+            csv_output = result_df.to_csv(index=False, header=False, encoding='cp1252').replace('\n', '\r\n')
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv_output,
+                file_name="outbound_output.csv",
+                mime="text/csv"
+            )
