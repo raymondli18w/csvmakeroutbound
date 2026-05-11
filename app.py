@@ -20,6 +20,9 @@ COLUMN_SYNONYMS = {
     'Zip Code': ['zip code', 'Zip Code', 'postal', 'Postal', 'ZIP'],
     'Country/Region': ['country', 'Country', 'Country/Region'],
     'Customer PO': ['customer po', 'Customer PO', 'PO', 'po number'],
+    'Pro Number': ['pro', 'Pro', 'PRO', 'pro number', 'tracking', 'Tracking', 
+                   'tracknumber', 'tracking #', 'tracking number', 'Tracking Number',
+                   'track no', 'Track No', 'track_no', 'pro_no'],  # Added Pro Number synonyms
 }
 
 # =========================
@@ -93,7 +96,7 @@ def process_tsv(raw_text):
         st.error(f"❌ Missing required columns after mapping: {missing_required}")
         return None
 
-    optional_cols = ['Ship To', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO']
+    optional_cols = ['Ship To', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Pro Number']
     for col in optional_cols:
         if col not in df.columns:
             df[col] = ''
@@ -110,6 +113,7 @@ def process_tsv(raw_text):
         client = safe_value(row, 'CLIENT').strip()
         whse = safe_value(row, 'WHSE').strip()
         pick_date = row['Pick Date Clean']
+        pro_number = safe_value(row, 'Pro Number').strip()  # Get Pro Number
 
         reasons = []
         if not so: reasons.append("Sales Order No. missing")
@@ -118,6 +122,7 @@ def process_tsv(raw_text):
         if not client: reasons.append("CLIENT missing")
         if not whse: reasons.append("WHSE missing")
         if pick_date is None: reasons.append("Pick Date invalid")
+        # Pro Number is optional - no validation needed
 
         if reasons:
             failed_rows.append((idx + 2, "; ".join(reasons)))
@@ -133,7 +138,7 @@ def process_tsv(raw_text):
         out_row = {chr(65 + i): '' for i in range(26)}
         out_row.update({f"A{chr(65+i)}": '' for i in range(26)})
 
-        # Populate (AF, AG, AH REMOVED)
+        # Populate columns
         out_row['A'] = 'BC'
         out_row['B'] = trim_text(client, 10)
         out_row['C'] = trim_text(so, 30)
@@ -148,6 +153,9 @@ def process_tsv(raw_text):
         out_row['X'] = trim_text(item, 20)
         out_row['Y'] = qty
         out_row['AJ'] = trim_text(whse, 10)
+        
+        # Add Pro Number to column T (20th column)
+        out_row['T'] = trim_text(pro_number, 50)  # 50 character limit for tracking numbers
 
         output_rows.append(out_row)
 
@@ -168,7 +176,8 @@ st.set_page_config(page_title="TSV to CSV Converter", layout="wide")
 st.title("🚛 TSV to Outbound CSV Converter")
 st.markdown("""
 Paste your **tab-separated** data below.  
-Required columns: `Client`, `WHSE`, `Reference`, `Pick Date`, `name`, `item`, `qty`, `Customer PO`
+Required columns: `Client`, `WHSE`, `Reference`, `Pick Date`, `name`, `item`, `qty`, `Customer PO`  
+Optional column: `Pro Number` (or any of these: pro, PRO, tracking, Tracking, tracknumber, tracking #, tracking number, pro_no)
 """)
 
 raw_data = st.text_area("Paste your TSV data:", height=300)
