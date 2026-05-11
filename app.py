@@ -17,12 +17,16 @@ COLUMN_SYNONYMS = {
     'Street': ['street', 'Street', 'Address', 'address'],
     'City': ['city', 'City'],
     'state': ['province', 'Province', 'state', 'State'],
-    'Zip Code': ['zip code', 'Zip Code', 'zipcode', 'Zipcode', 'postal', 'Postal', 'ZIP'],
+    'Zip Code': ['zip code', 'Zip Code', 'postal', 'Postal', 'ZIP'],
     'Country/Region': ['country', 'Country', 'Country/Region'],
     'Customer PO': ['customer po', 'Customer PO', 'PO', 'po number'],
     'Pro Number': ['pro', 'Pro', 'PRO', 'pro number', 'tracking', 'Tracking', 
                    'tracknumber', 'tracking #', 'tracking number', 'Tracking Number',
                    'track no', 'Track No', 'track_no', 'pro_no'],
+    'Ship To Code': ['shiptocode', 'ShipToCode', 'ship to code', 'Ship To Code', 
+                     'Ship Code', 'shipping code', 'Shipping Code', 'ship_code',
+                     'shipto code', 'ShipTo', 'ship_to_code'],
+    'SCAC': ['scac', 'SCAC', 'Scac', 'carrier code', 'Carrier Code', 'carrier_scac'],
 }
 
 # =========================
@@ -117,7 +121,7 @@ def process_tsv(raw_text):
         st.error(f"❌ Missing required columns after mapping: {missing_required}")
         return None
 
-    optional_cols = ['Ship To', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Pro Number']
+    optional_cols = ['Ship To', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Pro Number', 'Ship To Code', 'SCAC']
     for col in optional_cols:
         if col not in df.columns:
             df[col] = ''
@@ -135,6 +139,8 @@ def process_tsv(raw_text):
         whse = safe_value(row, 'WHSE').strip()
         pick_date = row['Pick Date Clean']
         pro_number = safe_value(row, 'Pro Number').strip()
+        ship_to_code = safe_value(row, 'Ship To Code').strip()
+        scac = safe_value(row, 'SCAC').strip()
 
         reasons = []
         if not so: reasons.append("Sales Order No. missing")
@@ -164,16 +170,18 @@ def process_tsv(raw_text):
         out_row['C'] = trim_text(so, 30)
         out_row['D'] = trim_text(safe_value(row, 'Customer PO'), 30)
         out_row['F'] = pick_date
+        out_row['H'] = trim_text(ship_to_code, 20)  # Ship To Code - column H
         out_row['I'] = trim_text(safe_value(row, 'Ship To'), 45)
         out_row['K'] = trim_text(safe_value(row, 'Street'), 30)
         out_row['M'] = trim_text(safe_value(row, 'City'), 10)
         out_row['N'] = trim_text(safe_value(row, 'state'), 10)
         out_row['O'] = trim_text(safe_value(row, 'Zip Code'), 10)
         out_row['P'] = trim_text(safe_value(row, 'Country/Region'), 10)
+        out_row['Q'] = trim_text(scac, 10)  # SCAC - column Q
+        out_row['T'] = trim_text(pro_number, 50)  # Pro Number - column T
         out_row['X'] = trim_text(item, 20)
         out_row['Y'] = qty
         out_row['AJ'] = trim_text(whse, 10)
-        out_row['T'] = trim_text(pro_number, 50)
 
         output_rows.append(out_row)
 
@@ -194,10 +202,15 @@ st.set_page_config(page_title="TSV to ANSI CSV Converter", layout="wide")
 st.title("🚛 TSV to Outbound ANSI CSV Converter")
 st.markdown("""
 Paste your **tab-separated** data below.  
-Required columns: `Client`, `WHSE`, `Reference`, `Pick Date`, `name`, `item`, `qty`, `Customer PO`  
-Optional column: `Pro Number` (or any of these: pro, PRO, tracking, Tracking, tracknumber, tracking #, tracking number, pro_no)
 
-**✅ ANSI Safe Mode**: Control characters (like 0x14) will be automatically removed for compatibility.
+**Required columns:** `Client`, `WHSE`, `Reference`, `Pick Date`, `name`, `item`, `qty`, `Customer PO`  
+
+**Optional columns:**  
+- `Pro Number` (pro, PRO, tracking, Tracking, tracknumber, tracking #, tracking number, pro_no) → Maps to **Column T**  
+- `Ship To Code` (shiptocode, ShipToCode, ship to code, Ship Code, shipping code, ShipTo) → Maps to **Column H**  
+- `SCAC` (scac, SCAC, carrier code, Carrier Code, carrier_scac) → Maps to **Column Q**  
+
+**✅ ANSI Safe Mode:** Control characters (like 0x14) will be automatically removed for compatibility.
 """)
 
 raw_data = st.text_area("Paste your TSV data:", height=300)
@@ -222,6 +235,11 @@ if st.button("✅ Process & Download CSV"):
                 mime="text/csv"
             )
             
-            # Optional: Show a preview
+            # Show success message
             st.success("✅ File processed successfully! Download ready.")
             st.caption(f"📄 Output size: {len(cleaned_csv_bytes):,} bytes (ANSI/Windows-1252 encoded)")
+            
+            # Show preview of first few rows
+            if st.checkbox("Show preview of first 5 rows"):
+                preview_df = df_out.head(5)
+                st.dataframe(preview_df)
