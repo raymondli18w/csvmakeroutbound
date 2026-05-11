@@ -14,6 +14,10 @@ COLUMN_SYNONYMS = {
     'WHSE': ['whse', 'WHSE', 'warehouse', 'Warehouse'],
     'CLIENT': ['client', 'Client', 'Customer', 'customer id'],
     'Ship To': ['name', 'Name', 'Ship To', 'ship to', 'recipient'],
+    'Ship To Name 2': ['name 2', 'Name 2', 'ship to name 2', 'Ship To Name 2', 
+                       'phone', 'Phone', 'phone #', 'phone number', 'Phone Number',
+                       'phone no', 'Phone No', 'telephone', 'Telephone', 'tel',
+                       'contact', 'Contact', 'attention', 'Attention'],
     'Street': ['street', 'Street', 'Address', 'address'],
     'City': ['city', 'City'],
     'state': ['province', 'Province', 'state', 'State'],
@@ -121,7 +125,7 @@ def process_tsv(raw_text):
         st.error(f"❌ Missing required columns after mapping: {missing_required}")
         return None
 
-    optional_cols = ['Ship To', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Pro Number', 'Ship To Code', 'SCAC']
+    optional_cols = ['Ship To', 'Ship To Name 2', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Pro Number', 'Ship To Code', 'SCAC']
     for col in optional_cols:
         if col not in df.columns:
             df[col] = ''
@@ -141,6 +145,7 @@ def process_tsv(raw_text):
         pro_number = safe_value(row, 'Pro Number').strip()
         ship_to_code = safe_value(row, 'Ship To Code').strip()
         scac = safe_value(row, 'SCAC').strip()
+        ship_to_name_2 = safe_value(row, 'Ship To Name 2').strip()  # New field for column J
 
         reasons = []
         if not so: reasons.append("Sales Order No. missing")
@@ -170,15 +175,16 @@ def process_tsv(raw_text):
         out_row['C'] = trim_text(so, 30)
         out_row['D'] = trim_text(safe_value(row, 'Customer PO'), 30)
         out_row['F'] = pick_date
-        out_row['H'] = trim_text(ship_to_code, 20)  # Ship To Code - column H
-        out_row['I'] = trim_text(safe_value(row, 'Ship To'), 45)
+        out_row['H'] = trim_text(ship_to_code, 10)  # Ship To Code - column H
+        out_row['I'] = trim_text(safe_value(row, 'Ship To'), 45)  # Ship To Name 1
+        out_row['J'] = trim_text(ship_to_name_2, 45)  # Ship To Name 2 / Phone - column J (30 char limit)
         out_row['K'] = trim_text(safe_value(row, 'Street'), 30)
-        out_row['M'] = trim_text(safe_value(row, 'City'), 10)
+        out_row['M'] = trim_text(safe_value(row, 'City'), 20)
         out_row['N'] = trim_text(safe_value(row, 'state'), 10)
         out_row['O'] = trim_text(safe_value(row, 'Zip Code'), 10)
         out_row['P'] = trim_text(safe_value(row, 'Country/Region'), 10)
         out_row['Q'] = trim_text(scac, 10)  # SCAC - column Q
-        out_row['T'] = trim_text(pro_number, 50)  # Pro Number - column T
+        out_row['T'] = trim_text(pro_number, 30)  # Pro Number - column T
         out_row['X'] = trim_text(item, 20)
         out_row['Y'] = qty
         out_row['AJ'] = trim_text(whse, 10)
@@ -209,6 +215,7 @@ Paste your **tab-separated** data below.
 - `Pro Number` (pro, PRO, tracking, Tracking, tracknumber, tracking #, tracking number, pro_no) → Maps to **Column T**  
 - `Ship To Code` (shiptocode, ShipToCode, ship to code, Ship Code, shipping code, ShipTo) → Maps to **Column H**  
 - `SCAC` (scac, SCAC, carrier code, Carrier Code, carrier_scac) → Maps to **Column Q**  
+- `Ship To Name 2` (name 2, Name 2, ship to name 2, phone, phone #, phone number, telephone, contact, attention) → Maps to **Column J**  
 
 **✅ ANSI Safe Mode:** Control characters (like 0x14) will be automatically removed for compatibility.
 """)
