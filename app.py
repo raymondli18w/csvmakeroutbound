@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from io import StringIO
+from io import StringIO, BytesIO
 from datetime import datetime
 
 # =========================
@@ -22,7 +22,7 @@ COLUMN_SYNONYMS = {
     'Customer PO': ['customer po', 'Customer PO', 'PO', 'po number'],
     'Pro Number': ['pro', 'Pro', 'PRO', 'pro number', 'tracking', 'Tracking', 
                    'tracknumber', 'tracking #', 'tracking number', 'Tracking Number',
-                   'track no', 'Track No', 'track_no', 'pro_no'],  # Added Pro Number synonyms
+                   'track no', 'Track No', 'track_no', 'pro_no'],
 }
 
 # =========================
@@ -78,6 +78,27 @@ def standardize_headers(df):
     return df
 
 # =========================
+# Clean Control Characters for ANSI
+# =========================
+def clean_ansi_content(csv_bytes):
+    """
+    Remove all control characters except:
+    - CR (0x0D) - Carriage Return
+    - LF (0x0A) - Line Feed  
+    - TAB (0x09) - Tab
+    Keeps only printable characters (0x20 and above) plus the exceptions above
+    """
+    # Keep: printable chars (>= 0x20) + CR (0x0D) + LF (0x0A) + TAB (0x09)
+    cleaned = bytes([b for b in csv_bytes if b >= 0x20 or b in (0x09, 0x0A, 0x0D)])
+    
+    # Optional: Log if we removed any control characters
+    removed_count = len(csv_bytes) - len(cleaned)
+    if removed_count > 0:
+        st.info(f"🧹 Removed {removed_count} control character(s) to ensure ANSI compatibility")
+    
+    return cleaned
+
+# =========================
 # Main Processing Function
 # =========================
 def process_tsv(raw_text):
@@ -113,7 +134,7 @@ def process_tsv(raw_text):
         client = safe_value(row, 'CLIENT').strip()
         whse = safe_value(row, 'WHSE').strip()
         pick_date = row['Pick Date Clean']
-        pro_number = safe_value(row, 'Pro Number').strip()  # Get Pro Number
+        pro_number = safe_value(row, 'Pro Number').strip()
 
         reasons = []
         if not so: reasons.append("Sales Order No. missing")
@@ -122,7 +143,6 @@ def process_tsv(raw_text):
         if not client: reasons.append("CLIENT missing")
         if not whse: reasons.append("WHSE missing")
         if pick_date is None: reasons.append("Pick Date invalid")
-        # Pro Number is optional - no validation needed
 
         if reasons:
             failed_rows.append((idx + 2, "; ".join(reasons)))
@@ -153,9 +173,7 @@ def process_tsv(raw_text):
         out_row['X'] = trim_text(item, 20)
         out_row['Y'] = qty
         out_row['AJ'] = trim_text(whse, 10)
-        
-        # Add Pro Number to column T (20th column)
-        out_row['T'] = trim_text(pro_number, 50)  # 50 character limit for tracking numbers
+        out_row['T'] = trim_text(pro_number, 50)
 
         output_rows.append(out_row)
 
@@ -172,12 +190,14 @@ def process_tsv(raw_text):
 # =========================
 # Streamlit UI
 # =========================
-st.set_page_config(page_title="TSV to CSV Converter", layout="wide")
-st.title("🚛 TSV to Outbound CSV Converter")
+st.set_page_config(page_title="TSV to ANSI CSV Converter", layout="wide")
+st.title("🚛 TSV to Outbound ANSI CSV Converter")
 st.markdown("""
 Paste your **tab-separated** data below.  
 Required columns: `Client`, `WHSE`, `Reference`, `Pick Date`, `name`, `item`, `qty`, `Customer PO`  
 Optional column: `Pro Number` (or any of these: pro, PRO, tracking, Tracking, tracknumber, tracking #, tracking number, pro_no)
+
+**✅ ANSI Safe Mode**: Control characters (like 0x14) will be automatically removed for compatibility.
 """)
 
 raw_data = st.text_area("Paste your TSV data:", height=300)
@@ -188,13 +208,20 @@ if st.button("✅ Process & Download CSV"):
     else:
         df_out = process_tsv(raw_data)
         if df_out is not None:
-            # Generate clean CSV: comma-delimited, UTF-8, .csv extension, starts with 's_'
-            csv_data = df_out.to_csv(index=False, header=False, sep=',', encoding='utf-8')
+            # Generate CSV as bytes
+            csv_bytes = df_out.to_csv(index=False, header=False, sep=',', encoding='cp1252', errors='replace')
+            
+            # Clean control characters for ANSI compatibility
+            cleaned_csv_bytes = clean_ansi_content(csv_bytes.encode('cp1252', errors='replace'))
             
             # Auto-trigger download
             st.download_button(
-                label="⬇️ Your file is ready — click to download",
-                data=csv_data,
+                label="⬇️ Your ANSI-safe file is ready — click to download",
+                data=cleaned_csv_bytes,
                 file_name="s_output.csv",
                 mime="text/csv"
             )
+            
+            # Optional: Show a preview
+            st.success("✅ File processed successfully! Download ready.")
+            st.caption(f"📄 Output size: {len(cleaned_csv_bytes):,} bytes (ANSI/Windows-1252 encoded)")
