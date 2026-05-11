@@ -17,7 +17,7 @@ COLUMN_SYNONYMS = {
     'Street': ['street', 'Street', 'Address', 'address'],
     'City': ['city', 'City'],
     'state': ['province', 'Province', 'state', 'State'],
-    'Zip Code': ['zip code', 'Zip Code', 'postal', 'Postal', 'ZIP'],
+    'Zip Code': ['zip code', 'Zip Code', 'zipcode', 'Zipcode', 'postal', 'Postal', 'ZIP'],
     'Country/Region': ['country', 'Country', 'Country/Region'],
     'Customer PO': ['customer po', 'Customer PO', 'PO', 'po number'],
     'Pro Number': ['pro', 'Pro', 'PRO', 'pro number', 'tracking', 'Tracking', 
