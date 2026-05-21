@@ -228,11 +228,21 @@ if st.button("✅ Process & Download CSV"):
     else:
         df_out = process_tsv(raw_data)
         if df_out is not None:
-            # Generate CSV as bytes
-            csv_bytes = df_out.to_csv(index=False, header=False, sep=',', encoding='cp1252', errors='replace')
+            # ✅ Generate CSV with explicit CRLF line endings for Windows/ANSI compatibility
+            csv_string = df_out.to_csv(
+                index=False, 
+                header=False, 
+                sep=',', 
+                encoding='cp1252', 
+                errors='replace',
+                lineterminator='\r\n'  # ✅ Adds CR+LF for proper Windows line endings
+            )
+            
+            # Convert to bytes
+            csv_bytes = csv_string.encode('cp1252', errors='replace')
             
             # Clean control characters for ANSI compatibility
-            cleaned_csv_bytes = clean_ansi_content(csv_bytes.encode('cp1252', errors='replace'))
+            cleaned_csv_bytes = clean_ansi_content(csv_bytes)
             
             # Auto-trigger download
             st.download_button(
@@ -244,7 +254,7 @@ if st.button("✅ Process & Download CSV"):
             
             # Show success message
             st.success("✅ File processed successfully! Download ready.")
-            st.caption(f"📄 Output size: {len(cleaned_csv_bytes):,} bytes (ANSI/Windows-1252 encoded)")
+            st.caption(f"📄 Output size: {len(cleaned_csv_bytes):,} bytes (ANSI/Windows-1252 encoded with CRLF)")
             
             # Show preview of first few rows
             if st.checkbox("Show preview of first 5 rows"):
