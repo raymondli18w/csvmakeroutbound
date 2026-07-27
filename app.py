@@ -31,6 +31,8 @@ COLUMN_SYNONYMS = {
                      'Ship Code', 'shipping code', 'Shipping Code', 'ship_code',
                      'shipto code', 'ShipTo', 'ship_to_code'],
     'SCAC': ['scac', 'SCAC', 'Scac', 'carrier code', 'Carrier Code', 'carrier_scac'],
+    'Reference 1': ['reference 1', 'Reference 1', 'ref 1', 'Ref 1', 'ref1', 'REF1'],  # NEW: Column U
+    'Reference 2': ['reference 2', 'Reference 2', 'ref 2', 'Ref 2', 'ref2', 'REF2'],  # NEW: Column V
 }
 
 # =========================
@@ -125,7 +127,7 @@ def process_tsv(raw_text):
         st.error(f"❌ Missing required columns after mapping: {missing_required}")
         return None
 
-    optional_cols = ['Ship To', 'Ship To Name 2', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Pro Number', 'Ship To Code', 'SCAC']
+    optional_cols = ['Ship To', 'Ship To Name 2', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Pro Number', 'Ship To Code', 'SCAC', 'Reference 1', 'Reference 2']  # Added Reference 1 & 2
     for col in optional_cols:
         if col not in df.columns:
             df[col] = ''
@@ -145,7 +147,9 @@ def process_tsv(raw_text):
         pro_number = safe_value(row, 'Pro Number').strip()
         ship_to_code = safe_value(row, 'Ship To Code').strip()
         scac = safe_value(row, 'SCAC').strip()
-        ship_to_name_2 = safe_value(row, 'Ship To Name 2').strip()  # New field for column J
+        ship_to_name_2 = safe_value(row, 'Ship To Name 2').strip()
+        reference_1 = safe_value(row, 'Reference 1').strip()  # NEW: Column U
+        reference_2 = safe_value(row, 'Reference 2').strip()  # NEW: Column V
 
         reasons = []
         if not so: reasons.append("Sales Order No. missing")
@@ -185,6 +189,8 @@ def process_tsv(raw_text):
         out_row['P'] = trim_text(safe_value(row, 'Country/Region'), 10)
         out_row['Q'] = trim_text(scac, 10)  # SCAC - column Q
         out_row['T'] = trim_text(pro_number, 30)  # Pro Number - column T
+        out_row['U'] = trim_text(reference_1, 30)  # NEW: Reference 1 - column U (30 char limit)
+        out_row['V'] = trim_text(reference_2, 30)  # NEW: Reference 2 - column V (30 char limit)
         out_row['X'] = trim_text(item, 20)
         out_row['Y'] = qty
         out_row['AJ'] = trim_text(whse, 10)
@@ -216,6 +222,8 @@ Paste your **tab-separated** data below.
 - `Ship To Code` (shiptocode, ShipToCode, ship to code, Ship Code, shipping code, ShipTo) → Maps to **Column H**  
 - `SCAC` (scac, SCAC, carrier code, Carrier Code, carrier_scac) → Maps to **Column Q**  
 - `Ship To Name 2` (name 2, Name 2, ship to name 2, phone, phone #, phone number, telephone, contact, attention) → Maps to **Column J**  
+- `Reference 1` (reference 1, Reference 1, ref 1, Ref 1, ref1, REF1) → Maps to **Column U**  
+- `Reference 2` (reference 2, Reference 2, ref 2, Ref 2, ref2, REF2) → Maps to **Column V**  
 
 **✅ ANSI Safe Mode:** Control characters (like 0x14) will be automatically removed for compatibility.
 """)
