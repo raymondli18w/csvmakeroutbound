@@ -34,7 +34,7 @@ COLUMN_SYNONYMS = {
     'Reference 1': ['reference 1', 'Reference 1', 'ref 1', 'Ref 1', 'ref1', 'REF1'],  # NEW: Column U
     'Reference 2': ['reference 2', 'Reference 2', 'ref 2', 'Ref 2', 'ref2', 'REF2'],  # NEW: Column V
     'Carrier': ['carrier', 'Carrier', 'carrier name', 'Carrier Name', 'carrier_name',  # NEW: Column R
-                'Carrier_Name', 'carriername', 'CarrierName', 'carrier code', 'Carrier Code'],
+                'Carrier_Name', 'carriername', 'Carrier Name', 'carrier code', 'Carrier Code'],
 }
 
 # =========================
