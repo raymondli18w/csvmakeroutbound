@@ -13,7 +13,7 @@ COLUMN_SYNONYMS = {
     'Each Qty': ['qty', 'Qty', 'quantity', 'Quantity', 'Each Qty'],
     'WHSE': ['whse', 'WHSE', 'warehouse', 'Warehouse'],
     'CLIENT': ['client', 'Client', 'Customer', 'customer id'],
-    'Ship To': ['name', 'Name', 'Ship To', 'ship to', 'recipient'],
+    'Ship To': ['name', 'Name', 'Ship To', 'ship to', 'recipient', 'ship to name', 'Ship To Name', 'Ship to Name'],
     'Ship To Name 2': ['name 2', 'Name 2', 'ship to name 2', 'Ship To Name 2', 
                        'phone', 'Phone', 'phone #', 'phone number', 'Phone Number',
                        'phone no', 'Phone No', 'telephone', 'Telephone', 'tel',
@@ -33,6 +33,8 @@ COLUMN_SYNONYMS = {
     'SCAC': ['scac', 'SCAC', 'Scac', 'carrier code', 'Carrier Code', 'carrier_scac'],
     'Reference 1': ['reference 1', 'Reference 1', 'ref 1', 'Ref 1', 'ref1', 'REF1'],  # NEW: Column U
     'Reference 2': ['reference 2', 'Reference 2', 'ref 2', 'Ref 2', 'ref2', 'REF2'],  # NEW: Column V
+    'Carrier': ['carrier', 'Carrier', 'carrier name', 'Carrier Name', 'carrier_name',  # NEW: Column R
+                'Carrier_Name', 'carriername', 'CarrierName', 'carrier code', 'Carrier Code'],
 }
 
 # =========================
@@ -127,7 +129,7 @@ def process_tsv(raw_text):
         st.error(f"❌ Missing required columns after mapping: {missing_required}")
         return None
 
-    optional_cols = ['Ship To', 'Ship To Name 2', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Pro Number', 'Ship To Code', 'SCAC', 'Reference 1', 'Reference 2']  # Added Reference 1 & 2
+    optional_cols = ['Ship To', 'Ship To Name 2', 'Street', 'City', 'state', 'Zip Code', 'Country/Region', 'Customer PO', 'Pro Number', 'Ship To Code', 'SCAC', 'Reference 1', 'Reference 2', 'Carrier']  # Added Carrier
     for col in optional_cols:
         if col not in df.columns:
             df[col] = ''
@@ -150,6 +152,7 @@ def process_tsv(raw_text):
         ship_to_name_2 = safe_value(row, 'Ship To Name 2').strip()
         reference_1 = safe_value(row, 'Reference 1').strip()  # NEW: Column U
         reference_2 = safe_value(row, 'Reference 2').strip()  # NEW: Column V
+        carrier = safe_value(row, 'Carrier').strip()  # NEW: Column R
 
         reasons = []
         if not so: reasons.append("Sales Order No. missing")
@@ -188,6 +191,7 @@ def process_tsv(raw_text):
         out_row['O'] = trim_text(safe_value(row, 'Zip Code'), 10)
         out_row['P'] = trim_text(safe_value(row, 'Country/Region'), 10)
         out_row['Q'] = trim_text(scac, 10)  # SCAC - column Q
+        out_row['R'] = trim_text(carrier, 30)  # Carrier - column R (30 char limit)
         out_row['T'] = trim_text(pro_number, 30)  # Pro Number - column T
         out_row['U'] = trim_text(reference_1, 30)  # NEW: Reference 1 - column U (30 char limit)
         out_row['V'] = trim_text(reference_2, 30)  # NEW: Reference 2 - column V (30 char limit)
@@ -221,6 +225,7 @@ Paste your **tab-separated** data below.
 - `Pro Number` (pro, PRO, tracking, Tracking, tracknumber, tracking #, tracking number, pro_no) → Maps to **Column T**  
 - `Ship To Code` (shiptocode, ShipToCode, ship to code, Ship Code, shipping code, ShipTo) → Maps to **Column H**  
 - `SCAC` (scac, SCAC, carrier code, Carrier Code, carrier_scac) → Maps to **Column Q**  
+- `Carrier` (carrier, Carrier, carrier name, Carrier Name, carrier_name, carriername, CarrierName) → Maps to **Column R**  
 - `Ship To Name 2` (name 2, Name 2, ship to name 2, phone, phone #, phone number, telephone, contact, attention) → Maps to **Column J**  
 - `Reference 1` (reference 1, Reference 1, ref 1, Ref 1, ref1, REF1) → Maps to **Column U**  
 - `Reference 2` (reference 2, Reference 2, ref 2, Ref 2, ref2, REF2) → Maps to **Column V**  
